@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-from flask import Flask, render_template
+#from flask import Flask, render_template
 import plotly.graph_objs as go
 import plotly.offline as pyo
+import plotly.graph_objs as go
 from pathlib import Path
 from datetime import datetime
 import json, os
 import threading,schedule, time
+from jinja2 import Environment, FileSystemLoader
 
-app = Flask(__name__)
+
+#app = Flask(__name__)
+TEMPLATE_DIR = "templates"
+TEMPLATE_FILE = "index.html"
+OUTPUT_FILE = Path("report.html")
 DIVAR_RESULTS = Path("./divar_results")
 
 def load_all_summaries():
@@ -196,13 +202,27 @@ def make_chart(summaries):
     return pyo.plot(fig, include_plotlyjs=False, output_type="div")
 
 
-@app.route("/")
-def index():
-    summaries = load_all_summaries()
-    if not summaries:
-        return "<p>No summary JSON files found.</p>"
+#@app.route("/")
+#def index():
+#    summaries = load_all_summaries()
+#    if not summaries:
+#        return "<p>No summary JSON files found.</p>"
+#
+#    chart_html = make_chart(summaries)
+#    latest = summaries[-1][1]
+#    latest_ts = summaries[-1][0].strftime("%Y-%m-%d %H:%M")
+#
+#    last_data = {
+#        "timestamp": latest_ts,
+#        "overall": latest["overall_avg_price_per_sqm"],
+#        "age0_4": latest["age_intervals"]["0-4"]["avg"],
+#        "age5_9": latest["age_intervals"]["5-9"]["avg"],
+#        "age10_14": latest["age_intervals"]["10-14"]["avg"],
+#        "age15_20": latest["age_intervals"]["15-20"]["avg"],
+#    }
 
-    chart_html = make_chart(summaries)
+    return render_template("index.html", chart_html=chart_html, last_data=last_data)
+def render_report(summaries):
     latest = summaries[-1][1]
     latest_ts = summaries[-1][0].strftime("%Y-%m-%d %H:%M")
 
@@ -215,7 +235,16 @@ def index():
         "age15_20": latest["age_intervals"]["15-20"]["avg"],
     }
 
-    return render_template("index.html", chart_html=chart_html, last_data=last_data)
+    env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+    template = env.get_template(TEMPLATE_FILE)
+    chart_html = make_chart(summaries)
+    html = template.render(chart_html=chart_html, last_data=last_data)
+
+    OUTPUT_FILE.write_text(html, encoding="utf-8")
+    print(f"Saved report to {OUTPUT_FILE.resolve()}")
+
+
+
 
 def daily_refresh():
     print("Refreshing data at 22:00…")
@@ -229,6 +258,17 @@ def schedule_thread():
         time.sleep(60)
 
 if __name__ == "__main__":
- threading.Thread(target=schedule_thread, daemon=True).start()
- app.run(host="0.0.0.0", port=8000, debug=True)
+ #threading.Thread(target=schedule_thread, daemon=True).start()
+ #app.run(host="0.0.0.0", port=8000, debug=True)
+ summaries = load_all_summaries()
+ if not summaries:
+    print("No summary JSON files found.")
+    exit(1)
+ else:
+    render_report(summaries)
+ daily_refresh()
+ 
+
+    
+    
  
