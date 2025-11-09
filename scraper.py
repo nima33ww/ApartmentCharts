@@ -2,6 +2,7 @@
 # scraper.py
 # Run with: python3.13 scraper.py
 
+import subprocess
 import requests
 import json
 from datetime import datetime
@@ -41,6 +42,8 @@ def extractor(diverRequest:DivarRequest):
  # Output setup & helpers
  # ------------------------
  ts = datetime.now().strftime("%Y%m%d_%H%M%S")  # timestamp with date+time
+ DATA_REPO_URL = "https://github.com/azi1233/DataApratmentCharts.git"
+
  out_dir = Path("./divar_results") / ts
  out_dir.mkdir(parents=True, exist_ok=True)
  
