@@ -6,7 +6,7 @@ on:
     paths-ignore:
       - 'report.html'
   schedule:
-    - cron: '30 09 * * *'   # daily at 18:30 UTC => 22:00 IRST
+    - cron: '15 13 * * *'   # daily at 18:30 UTC => 22:00 IRST
 
 permissions:
   contents: write
