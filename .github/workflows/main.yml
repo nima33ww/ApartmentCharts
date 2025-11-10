@@ -71,7 +71,7 @@ jobs:
             echo "✅ Changes detected in divar_results."
           fi
 
-           - name: Commit and push updated files (safe rebase)
+      - name: Commit and push updated files (safe rebase)
         env:
           REPO_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
         shell: bash
