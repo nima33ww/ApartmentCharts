@@ -1,64 +1,68 @@
 name: Generate report and publish
 
 # Triggers:
-#  - on push to main (but ignore changes to report.html to avoid loops)
-#  - on a daily schedule at 22:00 Iran time (UTC+3:30) -> 18:30 UTC
+#  - On push to main (ignore report.html to prevent infinite commit loops)
+#  - Scheduled daily at 22:00 Iran time (18:30 UTC)
 on:
   push:
     branches: [ main ]
     paths-ignore:
       - 'report.html'
   schedule:
-    - cron: '30 09 * * *'   # daily at 18:30 UTC => 22:00 IRST
+    - cron: '50 11 * * *'   # daily at 18:30 UTC => 22:00 IRST
 
 permissions:
-  contents: write   # allow pushing back to the repo with the built-in token
+  contents: write   # Allows the workflow to push commits back to the repository
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # Use a fresh Ubuntu runner
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0   # Fetch full history (needed for some git operations)
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.13'   # safe choice; change to '3.13' if you need it
+          python-version: '3.13'   # Ensure Python version matches your environment
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # Install dependencies if requirements.txt exists
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Run main.py (generate report.html)
-        run: |
-          python main.py
+      - name: Ensure divar_results folder exists
+        run: mkdir -p divar_results
+        # Makes sure the folder exists before main.py tries to write files into it
 
-      - name: Verify generated file
+      - name: Run main.py (generate report.html and divar_results)
+        run: python main.py
+        # This runs your main script which generates report.html and the divar_results files
+
+      - name: Verify generated files
         run: |
           echo "report.html exists: $( [ -f report.html ] && echo yes || echo no )"
-          ls -la .
+          echo "divar_results contents:"
+          ls -la divar_results || echo "divar_results folder empty or missing"
+        # Debug step: prints file existence and contents of divar_results in workflow logs
 
-      - name: Commit report.html if changed
+      - name: Commit report.html and divar_results if changed
         env:
           REPO_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
         run: |
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Stage only the generated file (change path if report.html is elsewhere)
-          git add report.html || true
-
-          # Only commit if there are staged changes
+          # Stage the generated files (report.html and all files in divar_results)
+          git add report.html divar_results/* || true
+          # Only commit if there are changes to avoid empty commits
           if ! git diff --cached --quiet; then
-            git commit -m "Auto-update report.html [skip ci]"
-            # Push back to main using the token:
+            git commit -m "Auto-update report.html and divar_results [skip ci]"
+            # Push changes back to the main branch
             git push "$REPO_URL" HEAD:main
           else
-            echo "No changes to report.html — nothing to commit."
-          fi
+            echo "No changes — nothing to commit."
