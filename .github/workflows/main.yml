@@ -1,18 +1,12 @@
 name: Generate report and publish
 
-# Triggers:
-#  - On push to main (ignore report.html to prevent infinite commit loops)
-#  - Scheduled daily at 22:00 Iran time (18:30 UTC)
+# Run daily at 22:00 Iran time (18:30 UTC)
 on:
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - 'report.html'
   schedule:
-    - cron: '50 13 * * *'   # daily at 18:30 UTC => 22:00 IRST
+    - cron: '55 18 * * *'   # 18:30 UTC = 22:00 IRST
 
 permissions:
-  contents: write   # allow pushing back to the repo with the built-in token
+  contents: write   # allow pushing changes back to the repo
 
 jobs:
   build:
@@ -22,12 +16,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # fetch full history so we can rebase properly
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'   # choose the Python version you need
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
@@ -36,64 +30,67 @@ jobs:
 
       - name: Ensure divar_results folder exists
         run: mkdir -p divar_results
-        # ensure folder exists so scripts that write into it won't fail
+
+      - name: Record pre-run state
+        id: pre_state
+        run: |
+          echo "Recording current divar_results state..."
+          find divar_results -type f -printf "%p\n" | sort > before.txt
+          echo "File count before:" $(wc -l < before.txt)
 
       - name: Run main.py (generate report.html and divar_results)
-        run: python main.py
-        # run your script which should write report.html and files into divar_results
-
-      - name: Verify generated files (debug)
+        id: run_script
         run: |
-          echo "report.html exists: $( [ -f report.html ] && echo yes || echo no )"
-          echo "divar_results contents:"
-          ls -la divar_results || echo "divar_results folder empty or missing"
+          echo "Running main.py..."
+          if ! python main.py; then
+            echo "❌ ERROR: main.py failed to execute properly."
+            exit 1
+          fi
 
-      - name: Commit report.html and divar_results if changed (safe & sync)
+      - name: Verify output
+        run: |
+          echo "Checking report.html..."
+          if [ ! -f "report.html" ]; then
+            echo "❌ ERROR: report.html not found after running main.py"
+            exit 1
+          fi
+
+          echo "Comparing divar_results before and after..."
+          find divar_results -type f -printf "%p\n" | sort > after.txt
+
+          # Show diffs for debug
+          echo "New or changed files:"
+          comm -13 before.txt after.txt || true
+
+          if diff before.txt after.txt >/dev/null; then
+            echo "❌ ERROR: No new or modified files detected in divar_results."
+            echo "Listing current contents:"
+            ls -la divar_results
+            exit 1
+          else
+            echo "✅ Changes detected in divar_results."
+          fi
+
+      - name: Commit updated files (report.html + divar_results)
         env:
           REPO_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
         shell: bash
         run: |
-          # Fail fast on errors; treat unset vars as errors and fail pipelines on pipe failures
           set -euo pipefail
 
-          # Configure git user
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Stage report.html (if present)
           git add report.html || true
+          git add divar_results/* || true
 
-          # Stage files inside divar_results if any exist (avoid glob expansion error when empty)
-          if [ -d "divar_results" ] && [ "$(ls -A divar_results 2>/dev/null || true)" != "" ]; then
-            git add divar_results/* || true
-          else
-            echo "No files in divar_results to add."
-          fi
-
-          # If there are no staged changes, skip commit/push
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
 
-          # Commit locally
           git commit -m "Auto-update report.html and divar_results [skip ci]"
-
-          # Set remote to use the token (overrides origin URL for this runner)
           git remote set-url origin "$REPO_URL"
-
-          # Make sure we have latest remote data (we fetched full history earlier, but fetch to be safe)
           git fetch --no-tags origin main
-
-          # Rebase our commit(s) on top of the remote main to avoid non-fast-forward rejections.
-          # If this fails due to conflicts, the step will fail and you'll need to resolve manually.
-          git rebase origin/main || {
-            echo "Rebase failed — aborting. Please resolve conflicts manually if needed."
-            git rebase --abort || true
-            exit 1
-          }
-
-          # Push the rebased commit. If remote advanced again between fetch and push, this will fail
-          # and the workflow will show a clear error (safer than forcing).
+          git rebase origin/main || { echo "Rebase failed — aborting."; git rebase --abort || true; exit 1; }
           git push origin HEAD:main
-
