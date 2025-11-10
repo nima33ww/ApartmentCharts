@@ -1,40 +1,99 @@
-      - name: Commit report.html and divar_results if changed
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+name: Generate report and publish
+
+# Triggers:
+#  - On push to main (ignore report.html to prevent infinite commit loops)
+#  - Scheduled daily at 22:00 Iran time (18:30 UTC)
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'report.html'
+  schedule:
+    - cron: '50 13 * * *'   # daily at 18:30 UTC => 22:00 IRST
+
+permissions:
+  contents: write   # allow pushing back to the repo with the built-in token
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # fetch full history so we can rebase properly
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'   # choose the Python version you need
+
+      - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Ensure divar_results folder exists
+        run: mkdir -p divar_results
+        # ensure folder exists so scripts that write into it won't fail
+
+      - name: Run main.py (generate report.html and divar_results)
+        run: python main.py
+        # run your script which should write report.html and files into divar_results
+
+      - name: Verify generated files (debug)
+        run: |
+          echo "report.html exists: $( [ -f report.html ] && echo yes || echo no )"
+          echo "divar_results contents:"
+          ls -la divar_results || echo "divar_results folder empty or missing"
+
+      - name: Commit report.html and divar_results if changed (safe & sync)
+        env:
+          REPO_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+        shell: bash
+        run: |
+          # Fail fast on errors; treat unset vars as errors and fail pipelines on pipe failures
           set -euo pipefail
 
-          # Configure committer identity
+          # Configure git user
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Configure remote so push uses the token
-          REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
-          git remote set-url origin "$REPO_URL"
+          # Stage report.html (if present)
+          git add report.html || true
 
-          # Ensure we have the latest remote state for main
-          git fetch origin main
-
-          # Stage report.html if present
-          git add -f report.html || true
-
-          # Stage divar_results files only if there are any (prevents glob expansion errors)
-          if compgen -G "divar_results/*" > /dev/null; then
-            git add divar_results/*
+          # Stage files inside divar_results if any exist (avoid glob expansion error when empty)
+          if [ -d "divar_results" ] && [ "$(ls -A divar_results 2>/dev/null || true)" != "" ]; then
+            git add divar_results/* || true
           else
             echo "No files in divar_results to add."
           fi
 
-          # Only commit if there are staged changes
-          if ! git diff --cached --quiet; then
-            git commit -m "Auto-update report.html and divar_results [skip ci]"
-
-            # Rebase on top of the latest remote main to avoid non-fast-forward pushes
-            # (this integrates any remote changes before pushing)
-            git pull --rebase origin main || true
-
-            # Push the result back to main. If there's still a race, this will fail and the action will stop.
-            git push origin HEAD:main
-          else
-            echo "No changes — nothing to commit."
+          # If there are no staged changes, skip commit/push
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
           fi
+
+          # Commit locally
+          git commit -m "Auto-update report.html and divar_results [skip ci]"
+
+          # Set remote to use the token (overrides origin URL for this runner)
+          git remote set-url origin "$REPO_URL"
+
+          # Make sure we have latest remote data (we fetched full history earlier, but fetch to be safe)
+          git fetch --no-tags origin main
+
+          # Rebase our commit(s) on top of the remote main to avoid non-fast-forward rejections.
+          # If this fails due to conflicts, the step will fail and you'll need to resolve manually.
+          git rebase origin/main || {
+            echo "Rebase failed — aborting. Please resolve conflicts manually if needed."
+            git rebase --abort || true
+            exit 1
+          }
+
+          # Push the rebased commit. If remote advanced again between fetch and push, this will fail
+          # and the workflow will show a clear error (safer than forcing).
+          git push origin HEAD:main
+
