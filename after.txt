@@ -32,4 +32,6 @@ divar_results/20251112_192433/request_payload.json
 divar_results/20251112_192433/summary_20251112_192433.json
 divar_results/20251112_192806/request_payload.json
 divar_results/20251112_192806/summary_20251112_192806.json
+divar_results/20251112_193800/request_payload.json
+divar_results/20251112_193800/summary_20251112_193800.json
 divar_results/20251112_223456/request_payload.json
