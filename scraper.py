@@ -337,6 +337,7 @@ def extractor(diverRequest: DivarRequest):
         print(f"Requesting server for size {min_sqm}-{max_sqm} ...")
         modified_payload = try_set_size_filters(payload, min_sqm, max_sqm)
         posts_for_range = fetch_for_payload_with_pagination(url, headers, modified_payload)
+        time.sleep(0.02)
 
         for post in posts_for_range:
             pid = post.get("map_post_card").get("id") or post.get("map_post_card").get("token") or post.get("map_post_card").get("post_token") or post.get("map_post_card").get("postId")
@@ -436,18 +437,18 @@ def extractor(diverRequest: DivarRequest):
             if age_key:
                 age_intervals[age_key].append(price_per_meter)
                 if size is not None:
-                    if size < 80:
+                    if size <= 80:
                         age_size_matrix[age_key]["<80"].append(price_per_meter)
-                    elif 80 <= size <= 120:
+                    elif 80 < size < 120:
                         age_size_matrix[age_key]["80-120"].append(price_per_meter)
                     else:
                         age_size_matrix[age_key][">120"].append(price_per_meter)
 
             # size-only buckets
             if size is not None:
-                if size < 80:
+                if size <= 80:
                     size_intervals["<80"].append(price_per_meter)
-                elif 80 <= size <= 120:
+                elif 80 < size < 120:
                     size_intervals["80-120"].append(price_per_meter)
                 else:
                     size_intervals[">120"].append(price_per_meter)

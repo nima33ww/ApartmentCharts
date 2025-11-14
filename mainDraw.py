@@ -236,7 +236,9 @@ def render_report(summaries,OUTPUT_FILE,TEMPLATE_DIR,TEMPLATE_FILE):
     env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
     template = env.get_template(TEMPLATE_FILE)
     chart_html = make_chart(summaries)
-    html = template.render(chart_html=chart_html, last_data=last_data)
+    html_title = str(OUTPUT_FILE)
+    html_title=html_title.removesuffix("_report.html")
+    html = template.render(chart_html=chart_html, last_data=last_data, report_title=html_title, tab_title=html_title)
 
     OUTPUT_FILE.write_text(html, encoding="utf-8")
     print(f"Saved report to {OUTPUT_FILE.resolve()}")

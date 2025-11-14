@@ -55,11 +55,11 @@ def run():
         }
     }
     
-    paths ="Khajeh_Mehran_ARAGHI"
+    paths ="Seyyed-Khandan_Araghi_Khaje-Abdollah_Mehran"
     
     Mehran = DivarRequest(url,headers,payload,paths)
     
-    extractor(Mehran)
+    #extractor(Mehran)
     
     
     
@@ -117,5 +117,174 @@ def run():
     paths ="Gisha"
     
     gisha = DivarRequest(url,headers,payload,paths)
-    extractor(gisha)
+    #extractor(gisha)
+    
+    
+    
+    ##ShahrAra
+    url = "https://api.divar.ir/v8/mapview/viewport"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        "Content-Type": "application/json; charset=utf-8",
+        "Accept": "application/json, text/plain, */*",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://divar.ir/",
+        "Accept-Language": "fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7"
+    }
+    
+    
+    payload = {
+        "city_ids": ["1"],
+        "search_data": {
+            "form_data": {
+                "data": {
+                    "bbox": {
+                        "repeated_float": {
+                            "value": [
+                                {"value": 51.3174362},
+                                {"value": 35.7004204},
+                                {"value": 51.4182167},
+                                {"value": 35.7357216}
+                            ]
+                        }
+                    },
+                    "building-age": {"number_range": {"maximum": "20"}},
+                    "elevator": {"boolean": {"value": True}},
+                    "has-photo": {"boolean": {"value": True}},
+                    "parking": {"boolean": {"value": True}},
+                    "size": {"number_range": {"minimum": "60", "maximum": "150"}},
+                    "category": {"str": {"value": "apartment-sell"}},
+                    "districts": {"repeated_string": {"value": ["202"]}}
+                }
+            }
+        },
+        "camera_info": {
+            "bbox": {
+                "min_latitude": 35.700421,
+                "min_longitude": 51.317436,
+                "max_latitude": 35.735721,
+                "max_longitude": 51.418215
+            },
+            "place_hash": "1|202|apartment-sell",
+            "zoom": 12.450042235879172
+        }
+    }
+    
+    paths ="ShahrAra"
+    
+    shahrara = DivarRequest(url,headers,payload,paths)
+    extractor(shahrara)
+    
+    
+    
+    
+    ##TehranVilla
+    url = "https://api.divar.ir/v8/mapview/viewport"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        "Content-Type": "application/json; charset=utf-8",
+        "Accept": "application/json, text/plain, */*",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://divar.ir/",
+        "Accept-Language": "fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7"
+    }
+    
+    
+    payload = {
+        "city_ids": ["1"],
+        "search_data": {
+            "form_data": {
+                "data": {
+                    "bbox": {
+                        "repeated_float": {
+                            "value": [
+                                {"value": 51.3441467},
+                                {"value": 35.7074127},
+                                {"value": 51.3795242},
+                                {"value": 35.7357025}
+                            ]
+                        }
+                    },
+                    "building-age": {"number_range": {"maximum": "20"}},
+                    "elevator": {"boolean": {"value": True}},
+                    "has-photo": {"boolean": {"value": True}},
+                    "parking": {"boolean": {"value": True}},
+                    "size": {"number_range": {"minimum": "60", "maximum": "150"}},
+                    "category": {"str": {"value": "apartment-sell"}},
+                    "districts": {"repeated_string": {"value": ["201"]}}
+                }
+            }
+        },
+        "camera_info": {
+            "bbox": {
+                "min_latitude": 35.709418,
+                "min_longitude": 51.346308,
+                "max_latitude": 35.737709,
+                "max_longitude": 51.381686
+            },
+            "place_hash": "1|201|apartment-sell",
+            "zoom": 12.450042235879172
+        }
+    }
+    
+    paths ="TehranVilla"
+    
+    tehranvilla = DivarRequest(url,headers,payload,paths)
+    extractor(tehranvilla)
+    
+    
+    ##YousefAbad_up
+    url = "https://api.divar.ir/v8/mapview/viewport"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        "Content-Type": "application/json; charset=utf-8",
+        "Accept": "application/json, text/plain, */*",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://divar.ir/",
+        "Accept-Language": "fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7"
+    }
+    
+    
+    payload = {
+        "city_ids": ["1"],
+        "search_data": {
+            "form_data": {
+                "data": {
+                    "bbox": {
+                        "repeated_float": {
+                            "value": [
+                                {"value": 51.378773},
+                                {"value": 35.717261},
+                                {"value": 51.425958},
+                                {"value": 35.754989}
+                            ]
+                        }
+                    },
+                    "building-age": {"number_range": {"maximum": "20"}},
+                    "elevator": {"boolean": {"value": True}},
+                    "has-photo": {"boolean": {"value": True}},
+                    "parking": {"boolean": {"value": True}},
+                    "size": {"number_range": {"minimum": "60", "maximum": "150"}},
+                    "category": {"str": {"value": "apartment-sell"}},
+                    "districts": {"repeated_string": {"value": ["90"]}}
+                }
+            }
+        },
+        "camera_info": {
+            "bbox": {
+                "min_latitude": 35.717261,
+                "min_longitude": 51.378773,
+                "max_latitude": 35.754989,
+                "max_longitude": 51.425958
+            },
+            "place_hash": "1|90|apartment-sell",
+            "zoom": 12.7
+        }
+    }
+    
+    paths ="YousefAbad_up"
+    
+    YousefAbad_up = DivarRequest(url,headers,payload,paths)
+    extractor(YousefAbad_up)
+    
     
