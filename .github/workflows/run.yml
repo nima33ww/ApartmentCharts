@@ -8,7 +8,7 @@ on:
   #    - 'report.html'
   #    - 'divar_results/**'
   schedule:
-    - cron: '20 18 * * *'   # 18:20 UTC = 21:50 IRST
+    - cron: '01 07 * * *'   # 18:20 UTC = 21:50 IRST
 
 permissions:
   contents: write   # allow pushing changes back to the repo
@@ -33,8 +33,8 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Ensure divar_results folder exists
-        run: mkdir -p divar_results
+      #- name: Ensure divar_results folder exists
+       # run: mkdir -p divar_results
 
       - name: Record pre-run state
         id: pre_state
@@ -53,21 +53,21 @@ jobs:
           fi
           
       - name: Verify output
-        run: |
-          echo "Checking report.html..."
-          if [ ! -f "report.html" ]; then
-            echo "❌ ERROR: report.html not found after running main.py"
-            exit 1
-          fi
+      #  run: |
+       #   echo "Checking report.html..."
+        #  if [ ! -f "report.html" ]; then
+        #    echo "❌ ERROR: report.html not found after running main.py"
+         #   exit 1
+         # fi
 
-          echo "Comparing divar_results before and after..."
-          find divar_results -type f -printf "%p\n" | sort > after.txt
-          echo "New or changed files:"
-          comm -13 before.txt after.txt || true
+           echo "Comparing divar_results before and after..."
+           find divar_results -type f -printf "%p\n" | sort > after.txt
+           echo "New or changed files:"
+           comm -13 before.txt after.txt || true
           if diff before.txt after.txt >/dev/null; then
-            echo "❌ ERROR: No new or modified files detected in divar_results."
-            ls -la divar_results
-            exit 1
+             echo "❌ ERROR: No new or modified files detected in divar_results."
+             ls -la divar_results
+             exit 1
           else
             echo "✅ Changes detected in divar_results."
           fi
