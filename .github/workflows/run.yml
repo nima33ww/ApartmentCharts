@@ -2,7 +2,11 @@ name: Generate report and publish
 
 on:
   schedule:
-    - cron: '09 07 * * *'
+    - cron: '45 07 * * *'
+
+concurrency:
+  group: generate-report-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -16,6 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -27,11 +32,19 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Record pre-run state
+      - name: Record pre-run state (checksums)
         id: pre_state
         run: |
-          echo "Recording current divar_results state..."
-          find divar_results -type f -print | sort > before.txt
+          # Ensure directory exists so find won't error
+          mkdir -p divar_results
+
+          # If there are files, compute checksums; otherwise create empty before.txt
+          if find divar_results -type f -print -quit | grep -q .; then
+            find divar_results -type f -exec sha256sum {} + | sort > before.txt
+          else
+            touch before.txt
+          fi
+          echo "File checksum list saved to before.txt"
           echo "File count before:" $(wc -l < before.txt)
 
       - name: Run main.py (generate report.html and divar_results)
@@ -43,21 +56,31 @@ jobs:
             exit 1
           fi
 
-      - name: Verify output
+      - name: Verify output (checksums)
+        id: verify
         run: |
-          echo "Comparing divar_results before and after..."
-          find divar_results -type f -print | sort > after.txt
-          echo "New or changed files:"
-          comm -13 before.txt after.txt || true
-          if diff before.txt after.txt >/dev/null; then
-            echo "❌ ERROR: No new or modified files detected in divar_results."
-            ls -la divar_results
-            exit 1
+          # Ensure divar_results exists
+          mkdir -p divar_results
+
+          if find divar_results -type f -print -quit | grep -q .; then
+            find divar_results -type f -exec sha256sum {} + | sort > after.txt
           else
-            echo "✅ Changes detected in divar_results."
+            touch after.txt
           fi
 
-      - name: Commit and push updated files (safe rebase)
+          echo "New or changed files (if any):"
+          comm -13 before.txt after.txt || true
+
+          if diff before.txt after.txt >/dev/null; then
+            echo "❌ ERROR: No new or modified files detected in divar_results."
+            ls -la divar_results || true
+            # Exit with non-zero so that scheduled run fails if no output was produced.
+            exit 1
+          else
+            echo "✅ Changes detected in divar_results (names or content)."
+          fi
+
+      - name: Commit and push updated files (safe)
         env:
           REPO_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
         shell: bash
@@ -65,6 +88,23 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Auto-update report.html and divar_results [skip ci]"
-          git push origin HEAD:main
+
+          # show status for debugging
+          git status --porcelain -uall || true
+
+          # Only commit if there are changes
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "Auto-update report.html and divar_results [skip ci]"
+
+            # Use token-authenticated remote explicitly
+            git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
+            # Attempt push. This may fail if branch protection rules disallow direct pushes.
+            if ! git push origin HEAD:main; then
+              echo "❌ ERROR: git push failed. Branch protection or permissions may prevent direct pushes."
+              exit 1
+            fi
+          else
+            echo "No changes to commit; skipping push."
+          fi
