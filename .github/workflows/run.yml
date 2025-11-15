@@ -1,17 +1,11 @@
 name: Generate report and publish
 
-# Run daily at 22:00 Iran time (18:30 UTC)
 on:
-  #push:
-  #  branches: [ main ]
-  #  paths-ignore:
-  #    - 'report.html'
-  #    - 'divar_results/**'
   schedule:
-    - cron: '01 07 * * *'   # 18:20 UTC = 21:50 IRST
+    - cron: '09 07 * * *'
 
 permissions:
-  contents: write   # allow pushing changes back to the repo
+  contents: write
 
 jobs:
   build:
@@ -33,14 +27,11 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      #- name: Ensure divar_results folder exists
-       # run: mkdir -p divar_results
-
       - name: Record pre-run state
         id: pre_state
         run: |
           echo "Recording current divar_results state..."
-          find divar_results -type f -printf "%p\n" | sort > before.txt
+          find divar_results -type f -print | sort > before.txt
           echo "File count before:" $(wc -l < before.txt)
 
       - name: Run main.py (generate report.html and divar_results)
@@ -51,23 +42,17 @@ jobs:
             echo "❌ ERROR: main.py failed to execute properly."
             exit 1
           fi
-          
-      - name: Verify output
-      #  run: |
-       #   echo "Checking report.html..."
-        #  if [ ! -f "report.html" ]; then
-        #    echo "❌ ERROR: report.html not found after running main.py"
-         #   exit 1
-         # fi
 
-           echo "Comparing divar_results before and after..."
-           find divar_results -type f -printf "%p\n" | sort > after.txt
-           echo "New or changed files:"
-           comm -13 before.txt after.txt || true
+      - name: Verify output
+        run: |
+          echo "Comparing divar_results before and after..."
+          find divar_results -type f -print | sort > after.txt
+          echo "New or changed files:"
+          comm -13 before.txt after.txt || true
           if diff before.txt after.txt >/dev/null; then
-             echo "❌ ERROR: No new or modified files detected in divar_results."
-             ls -la divar_results
-             exit 1
+            echo "❌ ERROR: No new or modified files detected in divar_results."
+            ls -la divar_results
+            exit 1
           else
             echo "✅ Changes detected in divar_results."
           fi
