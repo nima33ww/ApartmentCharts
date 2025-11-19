@@ -1,274 +1,104 @@
-#!/usr/bin/env python3
-#from flask import Flask, render_template
-import plotly.graph_objs as go
-import plotly.offline as pyo
-import plotly.graph_objs as go
 from pathlib import Path
-from datetime import datetime
-import json, os
-import threading,schedule, time
-from jinja2 import Environment, FileSystemLoader
+import mainDraw
 
+def main():
+    mainDraw.daily_refresh()
+    divar_root = Path("divar_results")
+    root = Path("./")
+    if not divar_root.exists():
+        print("divar_results directory not found.")
+        return
 
-#app = Flask(__name__)
-TEMPLATE_DIR = "templates"
-TEMPLATE_FILE = "index.html"
-OUTPUT_FILE = Path("report.html")
-DIVAR_RESULTS = Path("./divar_results")
+    folders = [f for f in divar_root.iterdir() if f.is_dir()]
+    if not folders:
+        print("No folders found in divar_results.")
+        return
 
-def load_all_summaries():
-    summaries = []
-    for folder in sorted(DIVAR_RESULTS.iterdir()):
-        if not folder.is_dir():
-            continue
-        for file in folder.glob("summary_*.json"):
-            try:
-                with open(file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    ts = datetime.strptime(data["timestamp"], "%Y-%m-%d %H:%M:%S")
-                    summaries.append((ts, data))
-            except Exception:
-                pass
-    summaries.sort(key=lambda x: x[0])
-    return summaries
+    # --- Generate reports ---
+    for folder in folders:
+        report_path = f"{folder.name}_report.html"
+        print(f"Generating report for {folder.name} -> {report_path}")
+        mainDraw.drawer(str(report_path), str(folder))
 
-def make_chart(summaries):
-    import plotly.subplots as sp
+    # --- Create index.html ---
+    # --- Create index.html ---
+    index_file = Path("index.html")
+    html_lines = [
+        "<!DOCTYPE html>",
+        "<html lang='en'>",
+        "<head>",
+        "  <meta charset='utf-8'>",
+        "  <meta name='viewport' content='width=device-width,initial-scale=1'>",
+        "  <title>Divar Results Index</title>",
+        "  <style>",
+        "    :root{",
+        "      --bg:#121212; --card:#1e1e2e; --muted:#90a4ae; --text:#e0e0e0; --accent:#ffab40;",
+        "      --btn-bg:#171722; --btn-hover:#23232b;",
+        "    }",
+        "    html,body{height:100%;margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Segoe UI', Roboto, Arial, sans-serif;}",
+        "    .wrap{max-width:1100px;margin:28px auto;padding:28px;}",
+        "    header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px;}",
+        "    h1{margin:0;font-size:1.6rem;color:var(--accent);font-weight:600}",
+        "    .subtitle{color:var(--muted);font-size:0.95rem}",
+        "    .grid{display:flex;flex-wrap:wrap;row-gap:30px;column-gap:12px;margin-top:18px}",
+        "    .btn{",
+        "      display:inline-flex;align-items:center;justify-content:center;gap:8px;",
+        "      padding:12px 18px;text-decoration:none;border-radius:10px;min-width:220px;flex-shrink:0;height:auto;",
+        "      background:linear-gradient(180deg,var(--btn-bg),var(--card));box-shadow:0 6px 18px rgba(0,0,0,0.6);color:var(--text);",
+        "      border:1px solid rgba(255,255,255,0.03);transition:transform .15s ease,box-shadow .15s ease,background .15s;",
+        "    }",
+        "    .btn .name{font-weight:600}",
+        "    .btn .meta{font-size:0.85rem;color:var(--muted)}",
+        "    .btn:hover{transform:translateY(-6px);box-shadow:0 14px 30px rgba(0,0,0,0.7);background:var(--btn-hover)}",
+        "    .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap}",
+        "    .search{padding:8px 12px;border-radius:8px;background:#0f0f12;border:1px solid rgba(255,255,255,0.03);color:var(--text)}",
+        "    footer{margin-top:28px;color:var(--muted);font-size:0.85rem;text-align:center}",
+        "    @media (max-width:640px){.btn{min-width:100%;justify-content:flex-start;padding:12px;border-radius:12px}}",
+        "  </style>",
+        "</head>",
+        "<body>",
+        "  <div class='wrap'>",
+        "    <header>",
+        "      <div>",
+        "        <h1>Reports</h1>",
+        "        <div class='subtitle'>Divar scrape results — open a folder to view its report</div>",
+        "      </div>",
+        "      <div class='controls'>",
+        "        <!-- optional search -->",
+        "        <input class='search' placeholder='Filter reports (client-side)...' oninput=\"(function(){const q=this.value.toLowerCase();document.querySelectorAll('.btn').forEach(b=>{b.style.display = (b.datasetName.toLowerCase().includes(q)||b.datasetMeta.toLowerCase().includes(q)) ? 'inline-flex' : 'none';});}).call(this)\" />",
+        "      </div>",
+        "    </header>",
+        "",
+        "    <div class='grid'>",
+        "      <!-- Buttons for each folder will be inserted here -->",
+        "      <!-- Example: <a class='btn' href='FOLDERNAME_report.html'>FOLDERNAME</a> -->",
+        "    </div>",
+        "",
+        "    <footer>",
+        "      Generated reports — open locally in your browser. <span style='color:var(--muted)'>Dark, modern theme</span>",
+        "    </footer>",
+        "  </div>",
+        "",
+        "  <script>",
+        "    document.addEventListener('DOMContentLoaded', ()=>{",
+        "      document.querySelectorAll('.grid a.btn').forEach(a=>{",
+        "        a.datasetName = a.dataset.name || a.textContent.trim();",
+        "        a.datasetMeta = a.dataset.meta || '';",
+        "      });",
+        "    });",
+        "  </script>",
+        "</body>",
+        "</html>",
+    ]
+    
+        
+    for folder in folders:
+        link = f"{folder.name}_report.html"
+        html_lines.append(f"  <a class='btn' href='{link}'>{folder.name}</a>")
+    html_lines += ["</body>", "</html>"]
 
-    timestamps = [s[0] for s in summaries]
-
-    # Price-related data
-    overall = [s[1]["overall_avg_price_per_sqm"] for s in summaries]
-    overall_count = [s[1]["valid_for_averages"] for s in summaries]
-
-    def get_age_data(interval):
-        return [s[1]["age_intervals"][interval]["avg"] for s in summaries], [
-            s[1]["age_intervals"][interval]["count"] for s in summaries
-        ]
-
-    def get_size_data(interval):
-        return [s[1]["size_intervals"][interval]["avg"] for s in summaries], [
-            s[1]["size_intervals"][interval]["count"] for s in summaries
-        ]
-
-    age0_4, cnt0_4 = get_age_data("0-4")
-    age5_9, cnt5_9 = get_age_data("5-9")
-    age10_14, cnt10_14 = get_age_data("10-14")
-    age15_20, cnt15_20 = get_age_data("15-20")
-
-    size_small, cnt_small = get_size_data("<80")
-    size_mid, cnt_mid = get_size_data("80-120")
-    size_large, cnt_large = get_size_data(">120")
-
-    # Create a subplot layout: 2 rows, 1 column
-    fig = sp.make_subplots(
-        rows=2,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.1,
-        row_heights=[0.7, 0.3],
-        subplot_titles=("Average Price per m² Over Time", "Number of Listings Over Time"),
-    )
-
-    # --- Chart 1: Price per sqm lines ---
-    fig.add_trace(
-        go.Scatter(
-            x=timestamps,
-            y=overall,
-            mode="lines+markers",
-            name=f"Overall Avg ({overall_count[-1]})",
-            line=dict(width=3, color="#ff9800"),
-            legendgroup="price",
-        ),
-        row=1, col=1
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=timestamps,
-            y=age0_4,
-            mode="lines+markers",
-            name=f"Age 0–4 ({cnt0_4[-1]})",
-            line=dict(color="#4caf50"),
-            legendgroup="price",
-        ),
-        row=1, col=1
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=timestamps,
-            y=age5_9,
-            mode="lines+markers",
-            name=f"Age 5–9 ({cnt5_9[-1]})",
-            line=dict(color="#2196f3"),
-            legendgroup="price",
-        ),
-        row=1, col=1
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=timestamps,
-            y=age10_14,
-            mode="lines+markers",
-            name=f"Age 10–14 ({cnt10_14[-1]})",
-            line=dict(color="#9c27b0"),
-            legendgroup="price",
-        ),
-        row=1, col=1
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=timestamps,
-            y=age15_20,
-            mode="lines+markers",
-            name=f"Age 15–20 ({cnt15_20[-1]})",
-            line=dict(color="#f44336"),
-            legendgroup="price",
-        ),
-        row=1, col=1
-    )
-
-    # --- Add size-based lines ---
-    fig.add_trace(
-        go.Scatter(
-            x=timestamps,
-            y=size_small,
-            mode="lines+markers",
-            name=f"Size <80m² ({cnt_small[-1]})",
-            line=dict(color="#8bc34a", dash="dot"),
-            legendgroup="size",
-        ),
-        row=1, col=1
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=timestamps,
-            y=size_mid,
-            mode="lines+markers",
-            name=f"Size 80–120m² ({cnt_mid[-1]})",
-            line=dict(color="#03a9f4", dash="dot"),
-            legendgroup="size",
-        ),
-        row=1, col=1
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=timestamps,
-            y=size_large,
-            mode="lines+markers",
-            name=f"Size >120m² ({cnt_large[-1]})",
-            line=dict(color="#e91e63", dash="dot"),
-            legendgroup="size",
-        ),
-        row=1, col=1
-    )
-
-    # --- Chart 2: Listing volume bars ---
-    total_posts = [s[1]["total_posts"] for s in summaries]
-    valid_posts = [s[1]["valid_for_averages"] for s in summaries]
-
-    fig.add_trace(
-        go.Bar(
-            x=timestamps,
-            y=total_posts,
-            name="Total Listings",
-            marker_color="rgba(100, 149, 237, 0.7)",
-            legendgroup="volume",
-        ),
-        row=2, col=1
-    )
-    fig.add_trace(
-        go.Bar(
-            x=timestamps,
-            y=valid_posts,
-            name="Valid Listings (for averages)",
-            marker_color="rgba(255, 152, 0, 0.7)",
-            legendgroup="volume",
-        ),
-        row=2, col=1
-    )
-
-    fig.update_layout(
-        template="plotly_dark",
-        hovermode="x unified",
-        height=850,
-        margin=dict(t=80, b=40, l=60, r=20),
-        legend_tracegroupgap=160,
-    )
-
-    fig.update_yaxes(title_text="Price (IRR)", row=1, col=1)
-    fig.update_yaxes(title_text="Listings", row=2, col=1)
-    fig.update_xaxes(title_text="Timestamp", row=2, col=1)
-
-    return pyo.plot(fig, include_plotlyjs=False, output_type="div")
-
-
-#@app.route("/")
-#def index():
-#    summaries = load_all_summaries()
-#    if not summaries:
-#        return "<p>No summary JSON files found.</p>"
-#
-#    chart_html = make_chart(summaries)
-#    latest = summaries[-1][1]
-#    latest_ts = summaries[-1][0].strftime("%Y-%m-%d %H:%M")
-#
-#    last_data = {
-#        "timestamp": latest_ts,
-#        "overall": latest["overall_avg_price_per_sqm"],
-#        "age0_4": latest["age_intervals"]["0-4"]["avg"],
-#        "age5_9": latest["age_intervals"]["5-9"]["avg"],
-#        "age10_14": latest["age_intervals"]["10-14"]["avg"],
-#        "age15_20": latest["age_intervals"]["15-20"]["avg"],
-#    }
-
-    return render_template("index.html", chart_html=chart_html, last_data=last_data)
-def render_report(summaries):
-    latest = summaries[-1][1]
-    latest_ts = summaries[-1][0].strftime("%Y-%m-%d %H:%M")
-
-    last_data = {
-        "timestamp": latest_ts,
-        "overall": latest["overall_avg_price_per_sqm"],
-        "age0_4": latest["age_intervals"]["0-4"]["avg"],
-        "age5_9": latest["age_intervals"]["5-9"]["avg"],
-        "age10_14": latest["age_intervals"]["10-14"]["avg"],
-        "age15_20": latest["age_intervals"]["15-20"]["avg"],
-    }
-
-    env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-    template = env.get_template(TEMPLATE_FILE)
-    chart_html = make_chart(summaries)
-    html = template.render(chart_html=chart_html, last_data=last_data)
-
-    OUTPUT_FILE.write_text(html, encoding="utf-8")
-    print(f"Saved report to {OUTPUT_FILE.resolve()}")
-
-
-
-
-def daily_refresh():
-    print("Refreshing data at 22:00…")
-    # your scraper or data updater here, e.g.:
-    os.system("python3.13 runner.py")
-
-def schedule_thread():
-    schedule.every().day.at("00:08").do(daily_refresh)
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
+    index_file.write_text("\n".join(html_lines), encoding="utf-8")
+    print(f"Index created at: {index_file}")
 
 if __name__ == "__main__":
- #threading.Thread(target=schedule_thread, daemon=True).start()
- #app.run(host="0.0.0.0", port=8000, debug=True)
- summaries = load_all_summaries()
- if not summaries:
-    print("No summary JSON files found.")
-    exit(1)
- else:
-    render_report(summaries)
- daily_refresh()
- 
-
-    
-    
- 
+    main()

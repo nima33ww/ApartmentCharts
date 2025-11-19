@@ -1,12 +1,15 @@
 name: Generate report and publish
 
-# Run daily at 22:00 Iran time (18:30 UTC)
 on:
   schedule:
-    - cron: '15 19 * * *'   # 18:30 UTC = 22:00 IRST
+    - cron: '45 07 * * *'
+
+concurrency:
+  group: generate-report-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-  contents: write   # allow pushing changes back to the repo
+  contents: write
 
 jobs:
   build:
@@ -17,25 +20,31 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Ensure divar_results folder exists
-        run: mkdir -p divar_results
-
-      - name: Record pre-run state
+      - name: Record pre-run state (checksums)
         id: pre_state
         run: |
-          echo "Recording current divar_results state..."
-          find divar_results -type f -printf "%p\n" | sort > before.txt
+          # Ensure directory exists so find won't error
+          mkdir -p divar_results
+
+          # If there are files, compute checksums; otherwise create empty before.txt
+          if find divar_results -type f -print -quit | grep -q .; then
+            find divar_results -type f -exec sha256sum {} + | sort > before.txt
+          else
+            touch before.txt
+          fi
+          echo "File checksum list saved to before.txt"
           echo "File count before:" $(wc -l < before.txt)
 
       - name: Run main.py (generate report.html and divar_results)
@@ -47,60 +56,55 @@ jobs:
             exit 1
           fi
 
-      - name: Verify output
+      - name: Verify output (checksums)
+        id: verify
         run: |
-          echo "Checking report.html..."
-          if [ ! -f "report.html" ]; then
-            echo "❌ ERROR: report.html not found after running main.py"
-            exit 1
+          # Ensure divar_results exists
+          mkdir -p divar_results
+
+          if find divar_results -type f -print -quit | grep -q .; then
+            find divar_results -type f -exec sha256sum {} + | sort > after.txt
+          else
+            touch after.txt
           fi
 
-          echo "Comparing divar_results before and after..."
-          find divar_results -type f -printf "%p\n" | sort > after.txt
-
-          # Show diffs for debug
-          echo "New or changed files:"
+          echo "New or changed files (if any):"
           comm -13 before.txt after.txt || true
 
           if diff before.txt after.txt >/dev/null; then
             echo "❌ ERROR: No new or modified files detected in divar_results."
-            echo "Listing current contents:"
-            ls -la divar_results
+            ls -la divar_results || true
+            # Exit with non-zero so that scheduled run fails if no output was produced.
             exit 1
           else
-            echo "✅ Changes detected in divar_results."
+            echo "✅ Changes detected in divar_results (names or content)."
           fi
 
-           - name: Commit and push updated files (safe rebase)
+      - name: Commit and push updated files (safe)
         env:
           REPO_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
         shell: bash
         run: |
           set -euo pipefail
-
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add report.html || true
-          git add divar_results/* || true
+          # show status for debugging
+          git status --porcelain -uall || true
 
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
+          # Only commit if there are changes
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "Auto-update report.html and divar_results [skip ci]"
+
+            # Use token-authenticated remote explicitly
+            git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
+            # Attempt push. This may fail if branch protection rules disallow direct pushes.
+            if ! git push origin HEAD:main; then
+              echo "❌ ERROR: git push failed. Branch protection or permissions may prevent direct pushes."
+              exit 1
+            fi
+          else
+            echo "No changes to commit; skipping push."
           fi
-
-          git commit -m "Auto-update report.html and divar_results [skip ci]"
-
-          # Make sure we’re up to date before pushing
-          git remote set-url origin "$REPO_URL"
-          git fetch --no-tags origin main
-
-          echo "Rebasing local changes onto latest remote main..."
-          git rebase origin/main || {
-            echo "⚠️ Rebase failed — aborting. Manual resolution needed."
-            git rebase --abort || true
-            exit 1
-          }
-
-          echo "Pushing rebased commit..."
-          git push origin HEAD:main
